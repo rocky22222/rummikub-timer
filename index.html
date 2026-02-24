@@ -5,16 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>拉密計時器</title>
 
-<!-- 圖示 -->
-<link rel="icon" type="image/png" href="icon.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icon.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="拉密計時器">
-
 <style>
-body{
+html, body {
     margin:0;
-    height:100vh;
+    padding:0;
+    height:100%;
+}
+
+body{
+    min-height:100dvh; /* ✅ 手機真正滿版 */
     display:flex;
     justify-content:center;
     align-items:center;
@@ -22,10 +21,11 @@ body{
     font-family:"Microsoft JhengHei",sans-serif;
     color:white;
 }
+
 .app{
     width:95vw;
     max-width:420px;
-    height:90vh;
+    min-height:95dvh;
     padding:15px;
     border-radius:25px;
     background:rgba(255,255,255,0.08);
@@ -51,7 +51,7 @@ select{
 .timer-container{
     position: relative;
     cursor: pointer;
-    padding: 140px 20px; /* 高度減少，適合手機 */
+    padding: 140px 20px; /* 高度適合手機 */
     display:flex;
     flex-direction:column;
     justify-content:center;
@@ -78,7 +78,7 @@ select{
     100% { transform: scale(1); }
 }
 
-/* 觸控回饋動畫 */
+/* 倒數區塊觸控回饋 */
 @keyframes clickFeedback {
     0% { transform: scale(1); }
     50% { transform: scale(0.92); }
@@ -88,6 +88,7 @@ select{
     animation: clickFeedback 0.15s forwards;
 }
 
+/* 暫停按鈕 */
 .pause-btn{
     padding:10px 25px;
     border-radius:15px;
@@ -96,6 +97,16 @@ select{
     color:white;
     font-size:16px;
     margin-top:10px;
+    cursor:pointer;
+}
+/* 暫停按鈕點擊動畫 */
+.pause-btn.click-feedback {
+    animation: scaleClick 0.15s forwards;
+}
+@keyframes scaleClick {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.9); }
+    100% { transform: scale(1); }
 }
 </style>
 </head>
@@ -170,7 +181,13 @@ timerContainer.addEventListener("click", () => {
 
 // 暫停/繼續
 pauseBtn.addEventListener("click", () => {
+    // 點擊回饋動畫
+    pauseBtn.classList.add("click-feedback");
+    setTimeout(()=>pauseBtn.classList.remove("click-feedback"),150);
+    playPauseBeep();
+
     if(!timerInterval && !isPaused && !isZeroState) return;
+
     if(isPaused){ // 繼續
         isPaused=false;
         pauseBtn.textContent="暫停";
@@ -179,7 +196,7 @@ pauseBtn.addEventListener("click", () => {
         } else {
             startZeroBeep();
         }
-    }else{ // 暫停
+    } else { // 暫停
         if(timerInterval){
             clearInterval(timerInterval);
             timerInterval=null;
@@ -248,6 +265,20 @@ function playClickBeep(){
     const osc=new OscillatorNode(ctx);
     osc.type="sine";
     osc.frequency.setValueAtTime(180,ctx.currentTime);
+    const gain=ctx.createGain();
+    gain.gain.setValueAtTime(0.5,ctx.currentTime);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime+0.15);
+}
+
+// 暫停/繼續不同音效
+function playPauseBeep(){
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    osc.type="triangle"; // 跟倒數區塊不同
+    osc.frequency.setValueAtTime(200,ctx.currentTime);
     const gain=ctx.createGain();
     gain.gain.setValueAtTime(0.5,ctx.currentTime);
     osc.connect(gain);
