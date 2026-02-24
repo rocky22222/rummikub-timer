@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>拉密計時器</title>
+<style>
+html, body {
+    margin:0;
+    padding:0;
+    height:100%;
+}
+body{
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    background:linear-gradient(135deg,#240046,#3c096c,#5a189a,#7b2cbf);
+    font-family:"Microsoft JhengHei",sans-serif;
+    color:white;
+}
+.app{
+    width:95vw;
+    max-width:420px;
+    min-height:95dvh;
+    padding: calc(30px + env(safe-area-inset-top)) 15px 15px 15px;
+    border-radius:25px;
+    background:rgba(255,255,255,0.08);
+    backdrop-filter:blur(20px);
+    box-shadow:0 12px 35px rgba(0,0,0,0.35);
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    text-align:center;
+}
+h1{font-size:20px;margin-bottom:12px;}
+.settings{
+    font-size:14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:15px;
+}
+select{
+    padding:8px;
+    border-radius:8px;
+    border:none;
+    width:95px;
+    text-align:center;
+}
+.timer-container{
+    position: relative;
+    cursor: pointer;
+    padding: 140px 20px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    background: rgba(255,255,255,0.05);
+    border-radius: 20px;
+}
+.player, .timer{
+    pointer-events: none;
+}
+.player{font-size:24px;}
+.timer{
+    font-size:90px;
+    font-weight:600;
+    transition:0.2s;
+}
+.warning{
+    color:#ff3b3b;
+    animation: pulse 0.5s infinite;
+}
+@keyframes pulse {0%{transform:scale(1);}50%{transform:scale(1.25);}100%{transform:scale(1);}}
+.timer-container.click-feedback{animation: clickFeedback 0.15s forwards;}
+@keyframes clickFeedback {0%{transform:scale(1);}50%{transform:scale(0.92);}100%{transform:scale(1);}}
+.pause-btn{
+    padding:10px 25px;
+    border-radius:15px;
+    border:none;
+    background:rgba(255,255,255,0.15);
+    color:white;
+    font-size:16px;
+    margin-top:10px;
+    cursor:pointer;
+}
+.pause-btn.click-feedback {animation: scaleClick 0.15s forwards;}
+@keyframes scaleClick {0%{transform:scale(1);}50%{transform:scale(0.9);}100%{transform:scale(1);}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+    <h1>拉密計時器</h1>
+    <div class="settings">
+        <div>
+            回合秒數<br>
+            <select id="roundSelect"><option value="30">30</option><option value="60" selected>60</option><option value="120">120</option></select>
+        </div>
+        <div>
+            玩家人數<br>
+            <select id="playerSelect"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option></select>
+        </div>
+    </div>
+
+    <div class="timer-container" id="timerContainer">
+        <div class="player" id="playerDisplay">玩家 1</div>
+        <div class="timer" id="timerDisplay">60</div>
+    </div>
+
+    <button class="pause-btn" id="pauseBtn">暫停</button>
+</div>
+
+<script>
+let roundTime=60, timeLeft=60, currentPlayer=1, totalPlayers=4;
+let timerTimeout=null, zeroBeepInterval=null;
+let isPaused=false, isZeroState=false;
+const timerDisplay=document.getElementById("timerDisplay");
+const playerDisplay=document.getElementById("playerDisplay");
+const timerContainer=document.getElementById("timerContainer");
+const pauseBtn=document.getElementById("pauseBtn");
+let audioCtx=null;
+
+function initAudioContext(){ if(!audioCtx){ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); } }
+
+function applySettings(){
+    roundTime=parseInt(document.getElementById("roundSelect").value);
+    totalPlayers=parseInt(document.getElementById("playerSelect").value);
+    resetAll();
+}
+document.getElementById("roundSelect").addEventListener("change",applySettings);
+document.getElementById("playerSelect").addEventListener("change",applySettings);
+
+function updateDisplay(){
+    timerDisplay.textContent=timeLeft;
+    playerDisplay.textContent="玩家 "+currentPlayer;
+    if(timeLeft<=10 && !isPaused && !isZeroState){
+        timerDisplay.classList.add("warning");
+        beepShort();
+    } else {
+        timerDisplay.classList.remove("warning");
+    }
+}
+
+function startTimer(){
+    if(isPaused || isZeroState) return;
+    if(timeLeft>0){
+        updateDisplay();
+        timerTimeout=setTimeout(()=>{
+            timeLeft--;
+            startTimer();
+        },1000);
+    } else {
+        isZeroState=true;
+        startZeroBeep();
+    }
+}
+
+function nextPlayer(){
+    clearTimeout(timerTimeout); timerTimeout=null;
+    isPaused=false; pauseBtn.textContent="暫停";
+    currentPlayer++; if(currentPlayer>totalPlayers) currentPlayer=1;
+    timeLeft=roundTime; isZeroState=false;
+    updateDisplay(); startTimer();
+}
+
+function startZeroBeep(){
+    if(zeroBeepInterval) return;
+    zeroBeepInterval=setInterval(()=>{
+        const osc=audioCtx.createOscillator();
+        osc.type="square";
+        osc.frequency.setValueAtTime(600,audioCtx.currentTime);
+        osc.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime+0.2);
+    },500);
+}
+function stopZeroBeep(){ clearInterval(zeroBeepInterval); zeroBeepInterval=null; }
+
+function beepShort(){
+    const osc=audioCtx.createOscillator();
+    osc.type="sine"; osc.frequency.setValueAtTime(1000,audioCtx.currentTime);
+    const gain=audioCtx.createGain(); gain.gain.setValueAtTime(0.5,audioCtx.currentTime);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime+0.08);
+}
+
+function playClickBeep(){
+    const osc=new OscillatorNode(audioCtx);
+    osc.type="sine"; osc.frequency.setValueAtTime(180,audioCtx.currentTime);
+    const gain=audioCtx.createGain(); gain.gain.setValueAtTime(0.5,audioCtx.currentTime);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime+0.15);
+}
+
+function playPauseBeep(){
+    const osc=audioCtx.createOscillator();
+    osc.type="triangle"; osc.frequency.setValueAtTime(200,audioCtx.currentTime);
+    const gain=audioCtx.createGain(); gain.gain.setValueAtTime(0.5,audioCtx.currentTime);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime+0.15);
+}
+
+function resetAll(){
+    clearTimeout(timerTimeout); timerTimeout=null;
+    stopZeroBeep();
+    currentPlayer=1; timeLeft=roundTime;
+    isPaused=false; isZeroState=false;
+    pauseBtn.textContent="暫停";
+    updateDisplay();
+}
+
+// 點擊倒數區塊事件
+timerContainer.addEventListener("click", ()=>{
+    initAudioContext();
+    timerContainer.classList.add("click-feedback");
+    setTimeout(()=>timerContainer.classList.remove("click-feedback"),150);
+    playClickBeep();
+    if(navigator.vibrate){ navigator.vibrate(50); }
+
+    if(timerTimeout && !isPaused && !isZeroState){ nextPlayer(); }
+    else if(!timerTimeout && !isPaused && !isZeroState){ startTimer(); }
+    else if(isZeroState){ stopZeroBeep(); nextPlayer(); }
+});
+
+// 暫停/繼續
+pauseBtn.addEventListener("click", ()=>{
+    initAudioContext();
+    pauseBtn.classList.add("click-feedback");
+    setTimeout(()=>pauseBtn.classList.remove("click-feedback"),150);
+    playPauseBeep();
+    if(!timerTimeout && !isPaused && !isZeroState) return;
+    if(isPaused){
+        isPaused=false;
+        pauseBtn.textContent="暫停";
+        if(!isZeroState){ startTimer(); } else { startZeroBeep(); }
+    } else {
+        if(timerTimeout){ clearTimeout(timerTimeout); timerTimeout=null; }
+        if(isZeroState){ stopZeroBeep(); }
+        isPaused=true;
+        pauseBtn.textContent="繼續";
+    }
+});
+
+applySettings();
+</script>
+</body>
+</html>
