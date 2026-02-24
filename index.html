@@ -95,11 +95,22 @@ select{
     <div class="settings">
         <div>
             回合秒數<br>
-            <select id="roundSelect"><option value="30">30</option><option value="60" selected>60</option><option value="120">120</option></select>
+            <select id="roundSelect">
+                <option value="12">12</option>
+                <option value="30">30</option>
+                <option value="60" selected>60</option>
+                <option value="120">120</option>
+            </select>
         </div>
         <div>
             玩家人數<br>
-            <select id="playerSelect"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option></select>
+            <select id="playerSelect">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4" selected>4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+            </select>
         </div>
     </div>
 
@@ -144,8 +155,8 @@ function updateDisplay(){
 
 function startTimer(){
     if(isPaused || isZeroState) return;
+    updateDisplay();
     if(timeLeft>0){
-        updateDisplay();
         timerTimeout=setTimeout(()=>{
             timeLeft--;
             startTimer();
