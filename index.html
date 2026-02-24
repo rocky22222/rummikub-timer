@@ -14,7 +14,7 @@ body{
     min-height:100dvh;
     display:flex;
     justify-content:center;
-    align-items:center;
+    align-items:flex-start;
     background:linear-gradient(135deg,#240046,#3c096c,#5a189a,#7b2cbf);
     font-family:"Microsoft JhengHei",sans-serif;
     color:white;
@@ -23,20 +23,25 @@ body{
     width:95vw;
     max-width:420px;
     min-height:95dvh;
-    padding: calc(15px + env(safe-area-inset-top)) 15px 15px 15px; /* 頂部安全區域 */
+    padding: calc(30px + env(safe-area-inset-top)) 15px 15px 15px;
     border-radius:25px;
     background:rgba(255,255,255,0.08);
     backdrop-filter:blur(20px);
     box-shadow:0 12px 35px rgba(0,0,0,0.35);
     display:flex;
     flex-direction:column;
-    justify-content:space-between;
+    justify-content:flex-start;
     text-align:center;
 }
 h1{font-size:20px;margin-bottom:12px;}
-.settings{font-size:14px;}
+.settings{
+    font-size:14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:15px;
+}
 select{
-    margin-top:5px;
     padding:8px;
     border-radius:8px;
     border:none;
@@ -86,12 +91,13 @@ select{
 </head>
 <body>
 <div class="app" id="app">
-    <div>
-        <h1>拉密計時器</h1>
-        <div class="settings">
+    <h1>拉密計時器</h1>
+    <div class="settings">
+        <div>
             回合秒數<br>
             <select id="roundSelect"><option value="30">30</option><option value="60" selected>60</option><option value="120">120</option></select>
-            <br><br>
+        </div>
+        <div>
             玩家人數<br>
             <select id="playerSelect"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option></select>
         </div>
@@ -107,13 +113,13 @@ select{
 
 <script>
 let roundTime=60, timeLeft=60, currentPlayer=1, totalPlayers=4;
-let timerInterval=null, zeroBeepInterval=null;
+let timerTimeout=null, zeroBeepInterval=null;
 let isPaused=false, isZeroState=false;
 const timerDisplay=document.getElementById("timerDisplay");
 const playerDisplay=document.getElementById("playerDisplay");
 const timerContainer=document.getElementById("timerContainer");
 const pauseBtn=document.getElementById("pauseBtn");
-let audioCtx=null; // 全局 AudioContext
+let audioCtx=null;
 
 function initAudioContext(){ if(!audioCtx){ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); } }
 
@@ -128,57 +134,30 @@ document.getElementById("playerSelect").addEventListener("change",applySettings)
 function updateDisplay(){
     timerDisplay.textContent=timeLeft;
     playerDisplay.textContent="玩家 "+currentPlayer;
-    if(timeLeft<=10 && timerInterval && !isPaused){
+    if(timeLeft<=10 && !isPaused && !isZeroState){
         timerDisplay.classList.add("warning");
         beepShort();
-    }else{
+    } else {
         timerDisplay.classList.remove("warning");
     }
 }
 
-timerContainer.addEventListener("click", () => {
-    initAudioContext();
-    timerContainer.classList.add("click-feedback");
-    setTimeout(()=>timerContainer.classList.remove("click-feedback"),150);
-    playClickBeep();
-    if(navigator.vibrate){ navigator.vibrate(50); }
-    if(timerInterval && !isPaused && !isZeroState){ nextPlayer(); }
-    else if(!timerInterval && !isPaused && !isZeroState){ startTimer(); }
-    else if(isZeroState){ stopZeroBeep(); nextPlayer(); }
-});
-
-pauseBtn.addEventListener("click", () => {
-    initAudioContext();
-    pauseBtn.classList.add("click-feedback");
-    setTimeout(()=>pauseBtn.classList.remove("click-feedback"),150);
-    playPauseBeep();
-    if(!timerInterval && !isPaused && !isZeroState) return;
-    if(isPaused){ 
-        isPaused=false;
-        pauseBtn.textContent="暫停";
-        if(!isZeroState){ startTimer(); } else { startZeroBeep(); }
-    } else { 
-        if(timerInterval){ clearInterval(timerInterval); timerInterval=null; }
-        if(isZeroState){ stopZeroBeep(); }
-        isPaused=true;
-        pauseBtn.textContent="繼續";
-    }
-});
-
 function startTimer(){
-    if(timerInterval) return;
-    timerInterval=setInterval(()=>{
-        if(timeLeft>0){ timeLeft--; updateDisplay(); }
-        else{
-            clearInterval(timerInterval); timerInterval=null;
-            isZeroState=true;
-            startZeroBeep();
-        }
-    },1000);
+    if(isPaused || isZeroState) return;
+    if(timeLeft>0){
+        updateDisplay();
+        timerTimeout=setTimeout(()=>{
+            timeLeft--;
+            startTimer();
+        },1000);
+    } else {
+        isZeroState=true;
+        startZeroBeep();
+    }
 }
 
 function nextPlayer(){
-    clearInterval(timerInterval); timerInterval=null;
+    clearTimeout(timerTimeout); timerTimeout=null;
     isPaused=false; pauseBtn.textContent="暫停";
     currentPlayer++; if(currentPlayer>totalPlayers) currentPlayer=1;
     timeLeft=roundTime; isZeroState=false;
@@ -222,13 +201,45 @@ function playPauseBeep(){
 }
 
 function resetAll(){
-    clearInterval(timerInterval); timerInterval=null;
+    clearTimeout(timerTimeout); timerTimeout=null;
     stopZeroBeep();
     currentPlayer=1; timeLeft=roundTime;
     isPaused=false; isZeroState=false;
     pauseBtn.textContent="暫停";
     updateDisplay();
 }
+
+// 點擊倒數區塊事件
+timerContainer.addEventListener("click", ()=>{
+    initAudioContext();
+    timerContainer.classList.add("click-feedback");
+    setTimeout(()=>timerContainer.classList.remove("click-feedback"),150);
+    playClickBeep();
+    if(navigator.vibrate){ navigator.vibrate(50); }
+
+    if(timerTimeout && !isPaused && !isZeroState){ nextPlayer(); }
+    else if(!timerTimeout && !isPaused && !isZeroState){ startTimer(); }
+    else if(isZeroState){ stopZeroBeep(); nextPlayer(); }
+});
+
+// 暫停/繼續
+pauseBtn.addEventListener("click", ()=>{
+    initAudioContext();
+    pauseBtn.classList.add("click-feedback");
+    setTimeout(()=>pauseBtn.classList.remove("click-feedback"),150);
+    playPauseBeep();
+    if(!timerTimeout && !isPaused && !isZeroState) return;
+    if(isPaused){
+        isPaused=false;
+        pauseBtn.textContent="暫停";
+        if(!isZeroState){ startTimer(); } else { startZeroBeep(); }
+    } else {
+        if(timerTimeout){ clearTimeout(timerTimeout); timerTimeout=null; }
+        if(isZeroState){ stopZeroBeep(); }
+        isPaused=true;
+        pauseBtn.textContent="繼續";
+    }
+});
 
 applySettings();
 </script>
